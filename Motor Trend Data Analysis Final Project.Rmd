@@ -1,0 +1,146 @@
+---
+title: "Motor Trend Data Analysis Final Project"
+author: "Carlos Martinez Reyes"
+date: "30/10/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Executive Summary
+In this report, we analyze the 1974 US Motor Trend magazine mtcars data set to evaluate the effect of transmission type on MPG (miles per gallon) performance. The database includes the fuel consumption and 10 design and performance aspects of 32 cars (1973–74 models). We use mpg as the response variable and fit a regression model considering a set of variables as predictors.
+
+# Exploratory Data Analysis
+```{r echo=TRUE}
+library(ggplot2)
+data(mtcars)
+dim(mtcars)
+head(mtcars)
+```
+The data consists of 32 samples (different automobiles) and 11 variables (10 control variables, 1 target variable (mpg). The data are numeric which is not correct for our finishers, so the next step is the transformation of variables.
+
+```{r  echo=TRUE}
+mtcars$cyl <- factor(mtcars$cyl)
+mtcars$vs <- factor(mtcars$vs)
+mtcars$am <- factor(mtcars$am, labels = c("Automatic", "Manual"))
+mtcars$gear <- factor(mtcars$gear)
+mtcars$carb <- factor(mtcars$carb)
+```
+Lets check the basic summary 
+
+```{r echo=TRUE}
+table(mtcars$am)
+aggregate(mpg ~ am, data = mtcars, mean)
+```
+From the above we can see that the automatic type car travels less miles per gallon compared to the manual transmission and this is also confirmed visually by referring to the FIGURE 1 in the appendix where we can see in the box diagram that the manual transmission provides a better MPG overall.
+
+# Statistical inference
+From the above we can say that ON AVERAGE the automatic type travels less miles per gallon compared to the manual transmission and we also confirm this analytically by proving that the difference between the MPG averages is statistically significant (Null hypothesis: the difference is not significant). We use the two-sample T-test to prove it.
+
+```{r echo=TRUE}
+Auto <- mtcars[mtcars$am == "Automatic",]$mpg
+NonAuto <- mtcars[mtcars$am == "Manual",]$mpg
+t.test(Auto, NonAuto)
+```
+
+### Quantifying the Mean
+Since the p-value is 0.001374, we reject the null hypothesis at 5% and 1% significance level and the mean MPG of cars with manual transmission is different (7.245 times more) from the average performance of cars with automatic transmission.
+
+# Regression Analysis
+We have already tested that there is a significant difference at 5% and 1% in the average MPG performance and we roughly quantify this difference. Now let's see what kind of relationship the MPG variable has with the rest of the factors. We will fit three regression models to the data to see if there is any change in mpg based on the transmission and we will see how the transmission affects the mpg by considering other variables.
+
+## Model 1: MPG and Transmission
+Here we start with a very simple model that is mpg regressed by am - Transmission.
+
+```{r echo=TRUE}
+fitam <- lm(mpg ~ am, mtcars)
+summary(fitam)
+```
+The R2 value for this model is only 0.3598, which means that adjusting mpg only with am explains about 36% of the variation in mpg because of its linear relationship. From the model we get an adjusted R-squared of 33.85% this quite a low variance explained by the model.
+Due to little variance explained by the model let examine other variable that are might be relevent to explain more variance to build a multivariate linear regression.
+Building a model that regresses mpg on all other variables in the dataset will explain more of the variance.
+
+## Model 2: MPG and all Variables
+```{r echo=TRUE}
+fullmodel <- lm(mpg ~ ., mtcars)
+summary(fullmodel)
+```
+As expected, the full model has a higher R2 value (0.8931). But the output of summary shows that none of the coefficients are significant at the 0.05 level. Including all the variables as the model has improved that is by explaining 77.9% of the variance which is given by Adjusted R-squared. The model has a residual standard error of 2.83, which means that the difference between the actual mpg and predicted mpg in the model differ by about 2.82 percentage points. We also get an R-squared of 0.8931.
+
+## Model 3: BESTFIT
+From figure 2 of the appendix we can see that there are predictor variables correlated with the am factor, which is why the exclusion of the variables that are correlated with the type of transmission is justified and will introduce biases in the coefficients. However, including unnecessary regressors will inflate the variance of the model.
+
+```{r echo=TRUE}
+bestfit <- lm(mpg ~ cyl + hp + wt + qsec + am, data = mtcars)
+summary(bestfit)
+```
+This works as expected the model has improved significantly to attain a R-squared of 84.14% and reduced our residual standard error to 2.4 from 2.8.
+
+### ANOVA
+Here run an anova test between the three models to see if they are significantly different from one another.
+anova(fitam, fullmodel, bestfit)
+
+This results in a p-value of 2.886e-05, and we can claim the bestfit model is significantly better and can see they are all normally distributed and homoskedastic.(see Figure 3)
+
+### Residuals Normality Test
+#### Shapiro-Wikes Test.
+However, this evaluation of residuals is based on the assumption of normality of residuals. A simple Shapiro-Wilkes test should confirm or negate this assumption.
+
+```{r echo=TRUE}
+Sfit=shapiro.test(fitam$resid)
+print(Sfit)
+Sfull=shapiro.test(fullmodel$resid)
+print(Sfull)
+Sbest=shapiro.test(bestfit$resid)
+print(Sbest)
+```
+From the outputs, in all cases the p-value > 0.05 implying that the distribution of the data are not significantly different from normal distribution. In other words, we can assume the normality. Hence, our evaluation of the residuals is valid and the models are a good fit for the data. This is supported by the graphs in Figure 3.
+
+## Appendix
+
+### Figure 1.
+```{r echo=TRUE}
+boxplot(mtcars$mpg~factor(mtcars$am, labels=c("Automatic", "Manual")),
+col=c("lightblue", "orange"), xlab="Transmission type",
+ylab="Mean MPG")
+```
+Lo que muestra el gráfico corresponde a la prueba t realizada anteriormente.
+
+### Figure 2.
+```{r}
+library(reshape2)
+library(ggplot2)
+data(mtcars)
+dim(mtcars)
+head(mtcars)
+```
+
+```{r echo=TRUE}
+data= mtcars
+corheatmap = round(cor(data),2)
+corheatmap[lower.tri(corheatmap)]<- NA
+melted <- melt(corheatmap)
+melted <- na.omit(melted)
+ggplot(data = melted, aes(Var2, Var1, fill = value))+
+ggtitle("Correlation Heatmap")+
+geom_tile(color = "white")+
+scale_fill_gradient2(low = "blue",
+high = "red", mid = "white",
+midpoint = 0, limit = c(-1,1), name="Correlation")+
+theme_minimal()+coord_fixed()
+```
+
+Variables correlated.
+
+### Figure 3.
+```{r echo=TRUE}
+par(mfrow = c(2,2))
+plot(bestfit, col = "blue", lwd = 2)
+```
+
+The Residual Fit Plot looks how we would expect it to look if residuals were independently and almost identically distributed with zero mean, and were uncorrelated with the fit. The highest residuals were for the outliers. The QQ Plot shows how the outliers, the Chrysler Impala, Lotus Europa and Fiat 128 affect the curve. Although they change the regression model, their impact is important and it would be unwise to remove them.
+
+## Conclusions
+Collectively for all control variables considered together, there is significant effect, while for each control variable including transmission design effect is insignificant. Individually, transmission design shows significant difference on MPG. 
